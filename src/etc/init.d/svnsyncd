@@ -1,0 +1,176 @@
+#!/bin/sh
+
+# Copyright (c) 2014 James Brandon Gooch
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+# DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+# OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+# OR OTHER DEALINGS IN THE SOFTWARE.
+
+#
+# svnsyncd    Startup script for svnsyncd daemon
+#
+### BEGIN INIT INFO
+# Provides: svnsyncd
+# Required-Start: $network
+# Required-Stop:
+# Default-Start:  3 4 5
+# Default-Stop:
+# Description:  svnsyncd daemon.
+### END INIT INFO
+
+
+# Sanity checks.
+[ -x /data/sbin/svnsyncd ] || exit 0
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+RETVAL=0
+
+start()
+{
+
+  PID=$(ps -ef | grep 'python' | grep 'svnsyncd' | grep -v grep | tail -1 | \
+    awk '{print $2}')
+
+  if [ "$PID" ] ; then
+    echo "svnsyncd is already running with pid: $PID"
+    return 0
+  else
+    # svnsyncd is not running, so start it
+    echo "starting svnsyncd"
+    /data/sbin/svnsyncd
+    PID=$(ps -ef | grep 'python' | grep 'svnsyncd' | grep -v grep | tail -1 | \
+      awk '{print $2}')
+    if [ "$PID" ] ; then
+      echo "svnsyncd started with pid: $PID"
+        return 0
+      else
+        echo "svnsyncd failed to start"
+        return 1
+      fi
+  fi
+}
+
+status()
+{
+
+  PID=$(ps -ef | grep 'python' | grep 'svnsyncd' | grep -v grep | tail -1 | \
+    awk '{print $2}')
+
+  if [ "$PID" ] ; then
+    echo "svnsyncd is running with pid: $PID"
+    return 0
+  else
+    echo "svnsyncd is not running"
+    return 1
+  fi
+}
+
+svnsync_procs_running()
+{
+
+  PID=$(ps -ef | grep 'bin/svnsync' | grep -v grep | tail -1 | awk '{print $2}')
+
+  if [ "$PID" ] ; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+stop()
+{
+
+  if [ -f /var/run/svnsyncd.pid ] ; then
+
+    PID=$(cat /var/run/svnsyncd.pid)
+
+    echo "stopping svnsyncd (running as PID: ${PID})"
+    kill -TERM $PID
+    echo -n "waiting for child threads to finish..."
+
+    STATUS=0
+
+    # Wait for svnsync process to stop.
+    while [ $STATUS == 0 ]; do
+      echo -n '.'
+      svnsync_procs_running >/dev/null 2>/dev/null
+      STATUS=$?
+      sleep 3
+    done
+
+    # Wait for svnsyncd to stop.
+    while [ $STATUS == 0 ]; do
+      echo -n '.'
+      status >/dev/null 2>/dev/null
+      STATUS=$?
+      sleep 3
+    done
+    echo ""
+    echo "svnsyncd has stopped"
+  else
+    echo "svnsyncd PID file does not exist."
+    echo "if svnsyncd is running, you need to kill it manually"
+  fi
+  return 0
+}
+
+graceful()
+{
+
+  PID=$(ps -ef | grep 'python' | grep 'svnsyncd' | grep -v grep | tail -1 | \
+    awk '{print $2}')
+
+  if [ "$PID" ] ; then
+    echo "gracefully restarting svnsyncd"
+    kill -USR1 `cat /var/run/svnsyncd.pid`
+  else
+    echo "svnsyncd is not running"
+  fi
+  return 0
+}
+
+# See how we were called.
+case "$1" in
+  start)
+    start
+    RETVAL=$?
+    ;;
+  stop)
+    stop
+    RETVAL=$?
+    ;;
+  status)
+    status
+    RETVAL=$?
+    ;;
+  restart)
+    stop
+    start
+    RETVAL=$?
+    ;;
+  graceful)
+    graceful
+    RETVAL=$?
+    ;;
+  *)
+    echo "Usage: svnsyncd {start|stop|restart|status|graceful}"
+    RETVAL=1
+esac
+
+exit $RETVAL

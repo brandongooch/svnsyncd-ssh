@@ -1,0 +1,13 @@
+/var/log/svnsyncd.log {
+        weekly
+        missingok
+        rotate 52
+        compress
+        delaycompress
+        notifempty
+        create 640 root root
+        sharedscripts
+        postrotate
+                /sbin/service svnsyncd graceful
+        endscript
+}
