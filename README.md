@@ -19,7 +19,7 @@ in a special way (other than the default of returning an generic error):
   '/trunk/path/to/file' is out of date
 
   E200014:
-  Base checksum mismatch on '/trunk/Maverick/services/AIMIntegrationService/.classpath':
+  Base checksum mismatch on '/trunk/path/to/file':
   expected:  2fc2793fd58f85c3e062ac6551975321 actual:  3e4b5656d196f5150afd4e7e9b15efa5
 
   E160049:
